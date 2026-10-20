@@ -5,6 +5,7 @@ import com.thinklab.application.dto.request.ReportBackupRunRequest;
 import com.thinklab.application.dto.request.UpdateBackupPolicyRequest;
 import com.thinklab.application.dto.response.AuditEntryResponse;
 import com.thinklab.application.dto.response.BackupPolicyResponse;
+import com.thinklab.application.dto.response.PromiseResponse;
 import com.thinklab.application.dto.response.BackupRunResponse;
 import com.thinklab.application.usecase.ControlBackupPolicyUseCase;
 import com.thinklab.application.usecase.InitiateBackupPolicyUseCase;
@@ -14,6 +15,7 @@ import com.thinklab.application.usecase.RetrieveBackupPolicyAuditLogUseCase;
 import com.thinklab.application.usecase.RetrieveBackupPolicyUseCase;
 import com.thinklab.application.usecase.RetrieveBackupRunUseCase;
 import com.thinklab.application.usecase.RetrieveBackupRunsUseCase;
+import com.thinklab.application.usecase.RetrievePromisesUseCase;
 import com.thinklab.application.usecase.UpdateBackupPolicyUseCase;
 import com.thinklab.domain.model.BackupPolicy.PolicyStatus;
 import com.thinklab.domain.model.BackupPolicy.Protection;
@@ -66,10 +68,12 @@ public class BackupRegistryController {
     private final ReportBackupRunUseCase reportRun;
     private final RetrieveBackupRunUseCase retrieveRun;
     private final RetrieveBackupRunsUseCase retrieveRuns;
+    private final RetrievePromisesUseCase retrievePromises;
 
     public BackupRegistryController(InitiateBackupPolicyUseCase initiatePolicy, RetrieveBackupPolicyUseCase retrievePolicy, RetrieveBackupPoliciesUseCase retrievePolicies,
                                     UpdateBackupPolicyUseCase updatePolicy, ControlBackupPolicyUseCase controlPolicy, RetrieveBackupPolicyAuditLogUseCase policyAuditLog,
-                                    ReportBackupRunUseCase reportRun, RetrieveBackupRunUseCase retrieveRun, RetrieveBackupRunsUseCase retrieveRuns) {
+                                    ReportBackupRunUseCase reportRun, RetrieveBackupRunUseCase retrieveRun, RetrieveBackupRunsUseCase retrieveRuns,
+                                    RetrievePromisesUseCase retrievePromises) {
         this.initiatePolicy = initiatePolicy;
         this.retrievePolicy = retrievePolicy;
         this.retrievePolicies = retrievePolicies;
@@ -79,6 +83,7 @@ public class BackupRegistryController {
         this.reportRun = reportRun;
         this.retrieveRun = retrieveRun;
         this.retrieveRuns = retrieveRuns;
+        this.retrievePromises = retrievePromises;
     }
 
     // ------------------------------------------------------------------ Policies
@@ -105,6 +110,16 @@ public class BackupRegistryController {
     public Mono<List<BackupPolicyResponse>> retrieveAll(@Header(TENANT_HEADER) @NotBlank String tenantId, @Header(ROLE_HEADER) @Nullable String role,
                                                         @QueryValue @Nullable PolicyStatus status, @QueryValue @Nullable UUID assetId, @QueryValue @Nullable Protection protection) {
         return Mono.defer(() -> retrievePolicies.execute(UUID.fromString(tenantId), status, assetId, protection, role).collectList());
+    }
+
+    /**
+     * Behavior Qualifier: {@code promises/retrieve} (platform ADR-001, the promises contract). Every broken promise and every one that changed within the days asked
+     * (30 unless asked, 1 to 365), at most {@code limit} of each (500 unless asked, at most 1000).
+     */
+    @Get("/promises/retrieve")
+    public Mono<List<PromiseResponse>> promises(@Header(TENANT_HEADER) @NotBlank String tenantId, @Header(ROLE_HEADER) @Nullable String role,
+                                                @QueryValue @Nullable Integer changedWithinDays, @QueryValue @Nullable Integer limit) {
+        return Mono.defer(() -> retrievePromises.execute(UUID.fromString(tenantId), changedWithinDays, limit, role));
     }
 
     /** Behavior Qualifier: {@code update}. The whole definition again. */

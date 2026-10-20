@@ -162,6 +162,42 @@ class BackupPolicyTest {
     }
 
     @Test
+    @DisplayName("the promise is broken (RPO) with a fixed code, broken (restore test overdue), kept with a backup inside the RPO, and not judged when paused or never backed up yet (platform ADR-001)")
+    void promise() {
+        Instant created = Instant.parse("2026-10-01T00:00:00Z");
+        Instant success = Instant.parse("2026-10-05T00:00:00Z");
+        BackupPolicy ok = reconstituted(PolicyStatus.ACTIVE, created, success, null, null, null);
+        BackupPolicy neverYet = reconstituted(PolicyStatus.ACTIVE, created, null, null, null, null);
+        BackupPolicy untested = reconstituted(PolicyStatus.ACTIVE, created, success, created, 30, 1);
+        BackupPolicy paused = reconstituted(PolicyStatus.PAUSED, created, null, null, 30, 7);
+
+        assertEquals(Promise.kept(), ok.promise(success.plus(Duration.ofHours(10))));
+        assertEquals(Promise.broken("BACKUP_RPO_BREACHED"), ok.promise(success.plus(Duration.ofHours(49))));
+        assertEquals(Promise.notJudged(), neverYet.promise(created.plus(Duration.ofHours(47))));
+        assertEquals(Promise.broken("BACKUP_RPO_BREACHED"), neverYet.promise(created.plus(Duration.ofHours(49))));
+        assertEquals(Promise.broken("BACKUP_RESTORE_TEST_OVERDUE"), untested.promise(success.plus(Duration.ofHours(30))));
+        assertEquals(Promise.notJudged(), paused.promise(created.plus(Duration.ofDays(400))));
+        assertEquals(Promise.Verdict.BROKEN, Promise.broken("X").verdict());
+        assertEquals("X", Promise.broken("X").code());
+    }
+
+    @Test
+    @DisplayName("a policy changed when it was updated or last ran, succeeded or was restore tested, whichever is latest")
+    void changedAt() {
+        Instant created = Instant.parse("2026-10-01T00:00:00Z");
+        Instant success = Instant.parse("2026-10-05T00:00:00Z");
+        Instant restore = Instant.parse("2026-10-06T00:00:00Z");
+        Instant run = Instant.parse("2026-10-07T00:00:00Z");
+        BackupPolicy none = reconstituted(PolicyStatus.ACTIVE, created, null, null, null, null);
+        BackupPolicy full = BackupPolicy.reconstitute(UUID.randomUUID(), org, "P", asset, 24, 48, 120, 30, null, PolicyStatus.ACTIVE, created, created, run, success, restore, 30, List.of());
+        BackupPolicy olderThanUpdate = BackupPolicy.reconstitute(UUID.randomUUID(), org, "P", asset, 24, 48, 120, 30, null, PolicyStatus.ACTIVE, created, restore, created, success, created, 30, List.of());
+
+        assertEquals(created, none.changedAt());
+        assertEquals(run, full.changedAt());
+        assertEquals(restore, olderThanUpdate.changedAt());
+    }
+
+    @Test
     @DisplayName("a paused policy is not judged")
     void paused() {
         Instant created = Instant.parse("2026-10-01T00:00:00Z");

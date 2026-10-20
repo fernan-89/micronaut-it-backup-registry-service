@@ -35,6 +35,7 @@ and, with platform security on, comes from the verified token.
 |---|---|
 | initiate | `POST /it-backup-registry/v1/initiate` `{"name":"Database nightly","assetId":"<uuid>","frequencyHours":24,"rpoHours":48,"rtoMinutes":120,"retentionDays":30,"restoreTestEveryDays":30}` (`restoreTestEveryDays` is optional) |
 | retrieve | `GET /it-backup-registry/v1/{id}/retrieve` (judged now) |
+| promises/retrieve | `GET /it-backup-registry/v1/promises/retrieve?changedWithinDays=&limit=` (the promises contract, ADR-034: every broken promise and every one that changed lately, each with `verdict`, a fixed `code` when broken, `status` and `changedAt`) |
 | retrieve (collection) | `GET /it-backup-registry/v1/retrieve?status=&assetId=&protection=` (oldest first) |
 | update | `PUT /it-backup-registry/v1/{id}/update` (the whole definition again, in any status) |
 | control/pause | `PUT /it-backup-registry/v1/{id}/control/pause` (ACTIVE -> PAUSED: no longer judged) |
@@ -75,7 +76,7 @@ Do not put personal data in a policy name: it is stored with the policy.
 ## Architecture decisions
 
 001 hexagonal architecture · 005 UUID identity sovereignty and audit tracing · 013 BIAN conventions · 019 HTTP 409 for state conflicts ·
-030 the tool reports, the registry keeps the facts · 031 the promise is judged when read · 032 staff only · 033 guarded writes and unique backstops.
+030 the tool reports, the registry keeps the facts · 031 the promise is judged when read · 032 staff only · 033 guarded writes and unique backstops · 034 the promises contract.
 
 ## License
 

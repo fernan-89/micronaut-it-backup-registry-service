@@ -218,6 +218,32 @@ public class BackupPolicy {
 
     public UUID getId() { return id; }
     public UUID getOrganisationId() { return organisationId; }
+    /**
+     * Whether the policy's promise is being kept, judged at {@code now} (platform ADR-001): broken when the latest backup is outside the RPO
+     * ({@code BACKUP_RPO_BREACHED}) or the restore test is overdue ({@code BACKUP_RESTORE_TEST_OVERDUE}), kept when there is a backup inside the RPO, not judged otherwise.
+     */
+    public Promise promise(Instant now) {
+        Assessment judged = assess(now);
+        if (judged.protection() == Protection.RPO_BREACHED) {
+            return Promise.broken("BACKUP_RPO_BREACHED");
+        }
+        if (judged.restoreTest() == RestoreTestStatus.OVERDUE) {
+            return Promise.broken("BACKUP_RESTORE_TEST_OVERDUE");
+        }
+        return judged.protection() == Protection.OK ? Promise.kept() : Promise.notJudged();
+    }
+
+    /** The last moment the policy or the facts it is judged on changed: an update, a run, a restore test. */
+    public Instant changedAt() {
+        Instant latest = updatedAt;
+        for (Instant moment : new Instant[]{lastRunAt, lastSuccessAt, lastRestoreTestAt}) {
+            if (moment != null && moment.isAfter(latest)) {
+                latest = moment;
+            }
+        }
+        return latest;
+    }
+
     public String getName() { return name; }
     public UUID getAssetId() { return assetId; }
     public int getFrequencyHours() { return frequencyHours; }
